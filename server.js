@@ -112,7 +112,7 @@ mongoose.connect('mongodb+srv://sharifrafid:srur2003@cluster0.sc1x6.mongodb.net/
     useNewUrlParser: true,
     useUnifiedTopology: true,
 }).then(() => {
-    const PORT = process.env.PORT || 5000;
+    const PORT = process.env.PORT || 3200;
     app.listen(PORT, () => {
         console.log(`Server is running on port ${PORT}`);
     });
