@@ -162,7 +162,7 @@ router.post('/placeOrder', async (req, res) => {
 
             // Create the order
             const newOrder = new Order({
-                name:customer.name,
+                name: customer.name,
                 phone: '',
                 email: customer.email,
                 restaurantId: restaurantId,
@@ -355,6 +355,55 @@ router.post('/profile-consumer', async (req, res) => {
     }
 });
 
+router.post('/login-admin', async (req, res) => {
+    await mongoConnect();
+    try {
+        const { email, password } = req.body;
+        var restaurant = await Admin.findOne({ email: email });
+        if (restaurant) {
+            if (restaurant.password == password) {
+                res.status(201).json(restaurant);
+                return;
+            } else {
+                res.status(403).json({ "message": "Wrong Password" });
+                return;
+            }
+        } else {
+            res.status(403).json({ "message": "Not signed up" });
+            return;
+        }
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error logging in' });
+        return;
+    }
+});
+
+router.post('/signup-admin', async (req, res) => {
+    await mongoConnect();
+    try {
+        const { name, email, password } = req.body;
+        var restaurant = await Admin.findOne({ email: email });
+        if (restaurant) {
+            res.status(403).json({ "message": "Already Registered. Please Login." });
+            return;
+        } else {
+            const idName = uuidv4();
+            restaurant = new Admin({
+                name: name,
+                email: email,
+                password: password
+            });
+            await restaurant.save();
+            res.status(201).json(restaurant);
+            return;
+        }
+    } catch (error) {
+        console.log(error);
+        res.status(403).json({ message: 'Error signing up' });
+        return;
+    }
+});
 
 router.post('/profile', async (req, res) => {
     await mongoConnect();
@@ -429,6 +478,124 @@ router.delete('/products', async (req, res) => {
     }
 });
 
+router.post('/add-restaurant', upload.single('imageFile'), async (req, res) => {
+    await mongoConnect();
+    try {
+        const { name, email, password, shortDescription, description } = req.body;
+        var imagePath = req.file.filename; // Path to the uploaded file
+
+        var restaurantId = uuidv4();
+
+        const newProduct = new Restaurant({
+            name,
+            email,
+            password,
+            restaurantId,
+            imagePath,
+            shortDescription,
+            description,
+            isActive: true,
+        });
+
+        await newProduct.save();
+
+        res.status(201).json(newProduct);
+        return;
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error creating product' });
+        return;
+    }
+});
+
+
+router.post('/update-restaurant', upload.single('imageFile'), async (req, res) => {
+    await mongoConnect();
+    try {
+        const { id, name, email, password, shortDescription, description } = req.body;
+        
+        var imagePath = null
+        
+        if(req.file){
+            imagePath = req.file.filename; // Path to the uploaded file
+        }
+
+        const product = await Restaurant.findById(id);
+
+        product.name = name;
+        product.email = email;
+        product.password = password;
+        product.shortDescription = shortDescription;
+        product.description = description;
+        if(imagePath){
+            product.imagePath = imagePath;
+        }
+        await product.save();
+      
+        const products = await Restaurant.find();
+
+        res.status(201).json(products);
+        return;
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error creating product' });
+        return;
+    }
+});
+
+router.delete('/restaurants', async (req, res) => {
+    await mongoConnect();
+    try {
+        if (req.query.id) {
+            const product = await Restaurant.findById(req.query.id);
+            if (product) {
+                await product.deleteOne();
+                res.status(201).json({ message: 'Success' });
+                return;
+            }
+        }
+        res.status(500).json({ message: 'Error deleting restaurants' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error deleting restaurants' });
+    }
+});
+
+router.get('/restaurants', async (req, res) => {
+    await mongoConnect();
+    try {
+        const products = await Restaurant.find();
+        res.json(products);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching orders' });
+    }
+});
+
+router.post('/restaurants-set-active', async (req, res) => {
+    await mongoConnect();
+    try {
+        if (req.query.id) {
+            const product = await Restaurant.findById(req.query.id);
+            if (product) {
+                if(product.isActive){
+                    product.isActive = false;
+                    await product.save();
+                }else{
+                    product.isActive = true;
+                    await product.save();    
+                }
+                const products = await Restaurant.find();
+                res.status(201).json(products);
+                return;
+            }
+        }
+        res.status(500).json({ message: 'Error deleting restaurants' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error deleting restaurants' });
+    }
+});
+
 const productSchema = new mongoose.Schema({
     name: String,
     price: String,
@@ -443,6 +610,10 @@ const accountSchema = new mongoose.Schema({
     email: String,
     password: String,
     restaurantId: String,
+    imagePath: String,
+    shortDescription: String,
+    description: String,
+    isActive: Boolean,
 });
 
 const customerSchema = new mongoose.Schema({
@@ -470,10 +641,17 @@ const orderSchema = new mongoose.Schema({
     }],
 });
 
+const adminSchema = new mongoose.Schema({
+    name: String,
+    email: String,
+    password: String,
+});
+
 const Product = mongoose.model('Product', productSchema);
 const Restaurant = mongoose.model('Restaurant', accountSchema);
 const Order = mongoose.model('Order', orderSchema);
 const Customer = mongoose.model('Customer', customerSchema);
+const Admin = mongoose.model('Admin', adminSchema);
 
 async function mongoConnect() {
     if (mongoose.connection.readyState == 0) {
