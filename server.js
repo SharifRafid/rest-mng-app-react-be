@@ -33,32 +33,6 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-router.post('/products', upload.single('imageFile'), async (req, res) => {
-    await mongoConnect();
-    try {
-        const { name, price, restaurantId, shortDescription, description } = req.body;
-        var imagePath = req.file.filename; // Path to the uploaded file
-
-        const newProduct = new Product({
-            name,
-            price,
-            restaurantId,
-            imagePath,
-            shortDescription,
-            description
-        });
-
-        await newProduct.save();
-
-        res.status(201).json(newProduct);
-        return;
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ message: 'Error creating product' });
-        return;
-    }
-});
-
 router.post('/cartProducts', async (req, res) => {
     await mongoConnect();
     try {
@@ -443,6 +417,39 @@ router.get('/products', async (req, res) => {
     }
 });
 
+router.post('/products', upload.single('imageFile'), async (req, res) => {
+    await mongoConnect();
+    try {
+        const { name, price, restaurantId, shortDescription, description } = req.body;
+        var imagePath = req.file.filename; // Path to the uploaded file
+
+        const restaurant = await Restaurant.findOne({ restaurantId: restaurantId });
+
+        if (restaurant.isActive != true) {
+            res.status(500).json({ message: 'Restaurant Is Deactivated' });
+            return;
+        }
+
+        const newProduct = new Product({
+            name,
+            price,
+            restaurantId,
+            imagePath,
+            shortDescription,
+            description
+        });
+
+        await newProduct.save();
+
+        res.status(201).json(newProduct);
+        return;
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error creating product' });
+        return;
+    }
+});
+
 router.get('/orders', async (req, res) => {
     await mongoConnect();
     try {
@@ -513,10 +520,10 @@ router.post('/update-restaurant', upload.single('imageFile'), async (req, res) =
     await mongoConnect();
     try {
         const { id, name, email, password, shortDescription, description } = req.body;
-        
+
         var imagePath = null
-        
-        if(req.file){
+
+        if (req.file) {
             imagePath = req.file.filename; // Path to the uploaded file
         }
 
@@ -527,11 +534,11 @@ router.post('/update-restaurant', upload.single('imageFile'), async (req, res) =
         product.password = password;
         product.shortDescription = shortDescription;
         product.description = description;
-        if(imagePath){
+        if (imagePath) {
             product.imagePath = imagePath;
         }
         await product.save();
-      
+
         const products = await Restaurant.find();
 
         res.status(201).json(products);
@@ -577,12 +584,12 @@ router.post('/restaurants-set-active', async (req, res) => {
         if (req.query.id) {
             const product = await Restaurant.findById(req.query.id);
             if (product) {
-                if(product.isActive){
+                if (product.isActive) {
                     product.isActive = false;
                     await product.save();
-                }else{
+                } else {
                     product.isActive = true;
-                    await product.save();    
+                    await product.save();
                 }
                 const products = await Restaurant.find();
                 res.status(201).json(products);
