@@ -116,7 +116,7 @@ router.post('/wishListProducts', async (req, res) => {
 router.post('/placeOrder', async (req, res) => {
     await mongoConnect();
     try {
-        const { email, password, restaurantId, totalPrice } = req.body;
+        const { email, password, restaurantId, totalPrice, tableName } = req.body;
         const customer = await Customer.findOne({ email: email, password: password });
 
         if (customer) {
@@ -143,6 +143,7 @@ router.post('/placeOrder', async (req, res) => {
                 totalPrice: totalPrice,
                 customerId: customer._id, // Assuming customer._id is the MongoDB ObjectId
                 products: orderProducts,
+                tableName: tableName
             });
 
             // Save the order to the database
@@ -515,7 +516,6 @@ router.post('/add-restaurant', upload.single('imageFile'), async (req, res) => {
     }
 });
 
-
 router.post('/update-restaurant', upload.single('imageFile'), async (req, res) => {
     await mongoConnect();
     try {
@@ -603,6 +603,127 @@ router.post('/restaurants-set-active', async (req, res) => {
     }
 });
 
+router.post('/restaurants-set-active', async (req, res) => {
+    await mongoConnect();
+    try {
+        if (req.query.id) {
+            const product = await Restaurant.findById(req.query.id);
+            if (product) {
+                if (product.isActive) {
+                    product.isActive = false;
+                    await product.save();
+                } else {
+                    product.isActive = true;
+                    await product.save();
+                }
+                const products = await Restaurant.find();
+                res.status(201).json(products);
+                return;
+            }
+        }
+        res.status(500).json({ message: 'Error deleting restaurants' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error deleting restaurants' });
+    }
+});
+
+router.post('/update-order-status', async (req, res) => {
+    await mongoConnect();
+    try {
+        if (req.query.id) {
+            const item = await Order.findById(req.query.id);
+            if (item) {
+                item.orderStatus = req.query.status;
+                await item.save();
+                res.status(201).json(item);
+                return;
+            }
+        }
+        res.status(500).json({ message: 'Error deleting restaurants' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error deleting restaurants' });
+    }
+});
+
+router.post('/res-tables', async (req, res) => {
+    await mongoConnect();
+    try {
+        if (req.query.id) {
+            const item = await Restaurant.findOne({
+                "restaurantId": req.query.id
+            });
+            if (item) {
+                if (!item.tables.includes(req.query.name)) {
+                    item.tables.push(req.query.name);
+                }
+                await item.save();
+                res.status(201).json(item);
+                return;
+            }
+        }
+        res.status(500).json({ message: 'Error tables' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error tables' });
+    }
+});
+
+router.delete('/delete-tables', async (req, res) => {
+    await mongoConnect();
+    try {
+        if (req.query.id) {
+            const item = await Restaurant.findOne({
+                "restaurantId": req.query.id
+            });
+            if (item) {
+                var tables = item.tables
+                const index = tables.indexOf(req.query.name);
+                if (index > -1) {
+                    tables.splice(index, 1);
+                }
+                item.tables = tables;
+                await item.save();
+                res.status(201).json(tables);
+                return;
+            }
+        }
+        res.status(500).json({ message: 'Error deleting tables' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error deleting tables' });
+    }
+});
+
+
+router.get('/tables', async (req, res) => {
+    await mongoConnect();
+    try {
+        if (req.query.restaurantId) {
+            const item = await Restaurant.findOne({ restaurantId: req.query.restaurantId });
+            if (item) {
+                var tables = item.tables;
+                const orders = await Order.find({ restaurantId: req.query.restaurantId });
+                orders.forEach(oItm => {
+                    if (oItm.orderStatus != "COMPLETE") {
+                        var index = tables.indexOf(oItm.tableName)
+                        if (index > -1) {
+                            tables.splice(index, 1);
+                        }
+                    }
+                })
+                res.status(201).json(tables);
+                return;
+            }
+        }
+        res.status(500).json({ message: 'Error deleting tables' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error deleting tables' });
+    }
+});
+
 const productSchema = new mongoose.Schema({
     name: String,
     price: String,
@@ -621,6 +742,7 @@ const accountSchema = new mongoose.Schema({
     shortDescription: String,
     description: String,
     isActive: Boolean,
+    tables: [String],
 });
 
 const customerSchema = new mongoose.Schema({
@@ -639,6 +761,8 @@ const orderSchema = new mongoose.Schema({
     restaurantId: String,
     totalPrice: String,
     customerId: String,
+    tableName: String,
+    orderStatus: String,
     products: [{
         name: String,
         imagePath: String,
