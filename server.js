@@ -116,7 +116,7 @@ router.post('/wishListProducts', async (req, res) => {
 router.post('/placeOrder', async (req, res) => {
     await mongoConnect();
     try {
-        const { email, password, restaurantId, totalPrice, tableName } = req.body;
+        const { email, password, restaurantId, totalPrice, tableName, tableId } = req.body;
         const customer = await Customer.findOne({ email: email, password: password });
 
         if (customer) {
@@ -143,7 +143,8 @@ router.post('/placeOrder', async (req, res) => {
                 totalPrice: totalPrice,
                 customerId: customer._id, // Assuming customer._id is the MongoDB ObjectId
                 products: orderProducts,
-                tableName: tableName
+                tableName: tableName,
+                tableId: tableId,
             });
 
             // Save the order to the database
@@ -383,10 +384,11 @@ router.post('/signup-admin', async (req, res) => {
 router.post('/profile', async (req, res) => {
     await mongoConnect();
     try {
-        const { name, email, password } = req.body;
+        const { name, email, password, wifiPass } = req.body;
         var restaurant = await Restaurant.findOne({ email: email, password: password });
         if (restaurant) {
             restaurant.name = name;
+            restaurant.wifiPass = wifiPass;
             await restaurant.save();
             res.status(201).json(restaurant);
             return;
@@ -655,8 +657,8 @@ router.post('/res-tables', async (req, res) => {
                 "restaurantId": req.query.id
             });
             if (item) {
-                if (!item.tables.includes(req.query.name)) {
-                    item.tables.push(req.query.name);
+                if (!item.tables.includes({ name: req.query.name, num: req.query.num })) {
+                    item.tables.push({ name: req.query.name, num: req.query.num });
                 }
                 await item.save();
                 res.status(201).json(item);
@@ -679,7 +681,7 @@ router.delete('/delete-tables', async (req, res) => {
             });
             if (item) {
                 var tables = item.tables
-                const index = tables.indexOf(req.query.name);
+                const index = tables.findIndex(table => table.name === req.query.name && table.num === req.query.num);
                 if (index > -1) {
                     tables.splice(index, 1);
                 }
@@ -707,7 +709,7 @@ router.get('/tables', async (req, res) => {
                 const orders = await Order.find({ restaurantId: req.query.restaurantId });
                 orders.forEach(oItm => {
                     if (oItm.orderStatus != "COMPLETE") {
-                        var index = tables.indexOf(oItm.tableName)
+                        var index = tables.findIndex(item => item.name === oItm.tableName && item.num === oItm.tableId);
                         if (index > -1) {
                             tables.splice(index, 1);
                         }
@@ -742,7 +744,11 @@ const accountSchema = new mongoose.Schema({
     shortDescription: String,
     description: String,
     isActive: Boolean,
-    tables: [String],
+    wifiPass: String,
+    tables: [{
+        name: String,
+        num: String
+    }],
 });
 
 const customerSchema = new mongoose.Schema({
@@ -762,6 +768,7 @@ const orderSchema = new mongoose.Schema({
     totalPrice: String,
     customerId: String,
     tableName: String,
+    tableId: String,
     orderStatus: String,
     products: [{
         name: String,
