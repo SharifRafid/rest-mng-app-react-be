@@ -118,6 +118,7 @@ router.post('/placeOrder', async (req, res) => {
     try {
         const { email, password, restaurantId, totalPrice, tableName, tableId } = req.body;
         const customer = await Customer.findOne({ email: email, password: password });
+        const restaurant = await Restaurant.findOne({ restaurantId: restaurantId });
 
         if (customer) {
             const productIds = customer.cart.map(product => new ObjectId(product));
@@ -145,6 +146,7 @@ router.post('/placeOrder', async (req, res) => {
                 products: orderProducts,
                 tableName: tableName,
                 tableId: tableId,
+                wifiPass: restaurant.wifiPass,
             });
 
             // Save the order to the database
@@ -726,6 +728,23 @@ router.get('/tables', async (req, res) => {
     }
 });
 
+router.get('/restaurantData', async (req, res) => {
+    await mongoConnect();
+    try {
+        if (req.query.restaurantId) {
+            const item = await Restaurant.findOne({ restaurantId: req.query.restaurantId });
+            if (item) {
+                res.status(201).json(item);
+                return;
+            }
+        }
+        res.status(500).json({ message: 'Error deleting tables' });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: 'Error deleting tables' });
+    }
+});
+
 const productSchema = new mongoose.Schema({
     name: String,
     price: String,
@@ -770,6 +789,7 @@ const orderSchema = new mongoose.Schema({
     tableName: String,
     tableId: String,
     orderStatus: String,
+    wifiPass: String,
     products: [{
         name: String,
         imagePath: String,
